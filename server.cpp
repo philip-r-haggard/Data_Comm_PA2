@@ -24,6 +24,9 @@ stackoverflow.com
 #include <ctime>
 #include <fstream>
 #include <cstring>
+#include <stdlib.h>
+#include <netdb.h>
+#include "packet.h"
 
 #define CHUNK_SIZE 4
 

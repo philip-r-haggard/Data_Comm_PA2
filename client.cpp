@@ -22,6 +22,11 @@ stackoverflow.com
 #include <string.h>
 #include <unistd.h>
 #include <cstring>
+#include <stdlib.h>
+#include <cstdlib>
+#include "packet.h"
+#include <math.h>
+#include <time.h>
 
 #define CHUNK_SIZE 4
 
