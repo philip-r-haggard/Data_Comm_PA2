@@ -79,7 +79,6 @@ int main(int argc, char *argv[]) {
 			bytes_received = recvfrom(mysocket, response, CHUNK_SIZE, 0, (struct sockaddr *)&server, &slen);
 			
 			cout << response << endl;
-
 		}
 	}
 

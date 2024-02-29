@@ -61,7 +61,7 @@ int main(int argc, char *argv[]) {
 		cout << "Error opening file for writing.\n";
 	} else {
 		char chunk[CHUNK_SIZE + 1];		    // initializing the size of each data chunk holder
-		char response[CHUNK_SIZE + 1];	// with (+ 1) to account for a null terminator
+		char response[CHUNK_SIZE + 1];	    // with (+ 1) to account for a null terminator
 		ssize_t bytes_received;
         const char* myString = "!";
         strcpy(response, myString);
