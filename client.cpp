@@ -64,24 +64,23 @@ int main(int argc, char *argv[]) {
     if (!file) {
 		cout << "Error opening file.\n";
 	} else {
-		char chunk[CHUNK_SIZE + 1];		    // initializing the size
-		char response[CHUNK_SIZE + 1];		// of each data chunk holder with (+ 1) to
-		char allCapitals[CHUNK_SIZE + 1];	// account for a null terminator
+		char chunk[CHUNK_SIZE + 1];		    // initializing the size of each data chunk holder
+		char response[CHUNK_SIZE + 1];		// with (+ 1) to account for a null terminator
 		ssize_t bytes_received;
-        const char delimiter[] = "\n";
 
-		while (file.read(chunk, CHUNK_SIZE)) {
+		while (!file.eof()) {
+            file.read(chunk, CHUNK_SIZE);
 			chunk[file.gcount()] = '\0';
+            cout << chunk << endl;
 			if (sendto(mysocket, chunk, file.gcount(), 0, (struct sockaddr *)&server, slen) == -1) {
 				cout << "Error in file sendto function.\n";
                 goto jmp;
 			}
 
-			recvfrom(mysocket, response, CHUNK_SIZE, 0, (struct sockaddr *)&server, &slen);
-			
-			cout << response << endl;
+			bytes_received = recvfrom(mysocket, response, CHUNK_SIZE, 0, (struct sockaddr *)&server, &slen);
 		}
 
+        const char delimiter[] = "\n";
 		if (sendto(mysocket, delimiter, strlen(delimiter), 0, (struct sockaddr *)&server, slen) == -1) {
 			cout << "Error sending delimiter.\n";
 		}

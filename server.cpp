@@ -54,6 +54,12 @@ int main(int argc, char *argv[]) {
 	if (bind(mysocket, (struct sockaddr *)&server, sizeof(server)) == -1)
 		cout << "Error in binding.\n";
 
+    // initialize client structure
+	memset((char *)&client, 0, sizeof(client));
+	client.sin_family = AF_INET;
+	client.sin_port = htons(port);
+	client.sin_addr.s_addr = htonl(INADDR_ANY);
+
 	// receive data in chunks of 4 bytes from client through socket and write to upload.txt
 	ofstream file("output.txt", ios::binary);
 
@@ -72,6 +78,8 @@ int main(int argc, char *argv[]) {
 			}
 
 			file.write(chunk, bytes_received);
+
+            response[bytes_received] = '\0';
 
 			if (sendto(mysocket, response, sizeof(response), 0, (struct sockaddr *)&client, clen)==-1) {
 				cout << "Error in sendto function.\n";
