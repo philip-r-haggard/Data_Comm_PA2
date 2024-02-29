@@ -68,6 +68,7 @@ int main(int argc, char *argv[]) {
 		char response[CHUNK_SIZE + 1];		// of each data chunk holder with (+ 1) to
 		char allCapitals[CHUNK_SIZE + 1];	// account for a null terminator
 		ssize_t bytes_received;
+        const char delimiter[] = "\n";
 
 		while (file.read(chunk, CHUNK_SIZE)) {
 			chunk[file.gcount()] = '\0';
@@ -76,9 +77,13 @@ int main(int argc, char *argv[]) {
                 goto jmp;
 			}
 
-			bytes_received = recvfrom(mysocket, response, CHUNK_SIZE, 0, (struct sockaddr *)&server, &slen);
+			recvfrom(mysocket, response, CHUNK_SIZE, 0, (struct sockaddr *)&server, &slen);
 			
 			cout << response << endl;
+		}
+
+		if (sendto(mysocket, delimiter, strlen(delimiter), 0, (struct sockaddr *)&server, slen) == -1) {
+			cout << "Error sending delimiter.\n";
 		}
 	}
 
