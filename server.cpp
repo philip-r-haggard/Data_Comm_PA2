@@ -41,6 +41,13 @@ int main(int argc, char *argv[]) {
 	int i = 0;
 	socklen_t clen = sizeof(client);
 
+	char payload[512];
+	memset(payload, 0, 512);
+	char serialized[512];
+	memset(serialized, 0, 512);
+
+	packet receivedPacket(0, 0, 0, payload);
+
 	// create a new socket
 	if ((mysocket=socket(AF_INET, SOCK_DGRAM, 0))==-1)
 		cout << "Error in socket creation.\n";
@@ -63,30 +70,23 @@ int main(int argc, char *argv[]) {
 	// receive data in chunks of 4 bytes from client through socket and write to upload.txt
 	ofstream file("output.txt", ios::binary);
 
+	char *dataPointer;
+	char *outputData;
+
 	if (!file.is_open()) {
 		cout << "Error opening file for writing.\n";
 	} else {
-		char chunk[CHUNK_SIZE + 1];		    // initializing the size of each data chunk holder
-		char response[CHUNK_SIZE + 1];	    // with (+ 1) to account for a null terminator
-		ssize_t bytes_received;
-        const char* myString = "!";
-        strcpy(response, myString);
+		while ((recvfrom(mysocket, serialized, 512, 0, (struct sockaddr *)&client, &clen)) > 0) {
+			receivedPacket.deserialize(serialized);
+			receivedPacket.printContents();
 
-		while ((bytes_received = recvfrom(mysocket, chunk, CHUNK_SIZE, 0, (struct sockaddr *)&client, &clen)) > 0) {
-			if (bytes_received == 1 && chunk[0] == '\n') {
+			dataPointer = receivedPacket.getData();
+
+			file << dataPointer;
+
+			if (receivedPacket.getType() == 2)
+			{
 				goto jmp;
-			}
-
-			file.write(chunk, bytes_received);
-
-            response[bytes_received] = '\0';
-
-			if (sendto(mysocket, response, sizeof(response), 0, (struct sockaddr *)&client, clen)==-1) {
-				cout << "Error in sendto function.\n";
-			}
-
-			if (bytes_received == -1) {
-				cout << "Error receiving data.\n";
 			}
 		}
 	}

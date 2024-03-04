@@ -28,13 +28,14 @@ stackoverflow.com
 #include <math.h>
 #include <time.h>
 
-#define CHUNK_SIZE 4
+#define CHUNK_SIZE 5
 
 using namespace std;
 
 int main(int argc, char *argv[]) {
 
 	// resolve the hostname to an IP address
+	int packetLen = 50;
 	struct hostent *s;
 	s = gethostbyname(argv[1]);
 
@@ -56,34 +57,46 @@ int main(int argc, char *argv[]) {
 		(char *)&server.sin_addr.s_addr,
 		s->h_length);
 
-    // READ FROM FILE AND SEND TO SERVER HERE
-
     // read data from file and send data in chunks of 4 bytes to the server through the new socket
 	ifstream file(argv[3], ios_base::in | ios_base::binary);
 
     if (!file) {
 		cout << "Error opening file.\n";
 	} else {
-		char chunk[CHUNK_SIZE + 1];		    // initializing the size of each data chunk holder
-		char response[CHUNK_SIZE + 1];		// with (+ 1) to account for a null terminator
-		ssize_t bytes_received;
+		char payload[512];
+		char spacket[packetLen];
+		memset(spacket, 0, packetLen);
+		int sequenceNumber = 0;
 
-		while (!file.eof()) {
-            file.read(chunk, CHUNK_SIZE);
-			chunk[file.gcount()] = '\0';
-            cout << chunk << endl;
-			if (sendto(mysocket, chunk, file.gcount(), 0, (struct sockaddr *)&server, slen) == -1) {
-				cout << "Error in file sendto function.\n";
-                goto jmp;
+		while (!file.eof())
+		{
+			file.read(payload, CHUNK_SIZE); // read the data from the file in chunks of 5 characters
+
+			payload[file.gcount()] = '\0'; // mark the end of the chunk will a null character
+			int bytesRead = file.gcount();
+
+			packet mySendPacket(1, sequenceNumber, bytesRead, payload);
+
+			if(sequenceNumber == 0)
+			{
+				sequenceNumber = 1;
+			}
+			else
+			{
+				sequenceNumber = 0;
 			}
 
-			bytes_received = recvfrom(mysocket, response, CHUNK_SIZE, 0, (struct sockaddr *)&server, &slen);
+			mySendPacket.serialize(spacket);
+
+			if (sendto(mysocket, spacket, 50, 0, (struct sockaddr *)&server, slen) == -1) {
+				cout << "Error in file sendto function.\n";
+				goto jmp;
+			}
 		}
 
-        const char delimiter[] = "\n";
-		if (sendto(mysocket, delimiter, strlen(delimiter), 0, (struct sockaddr *)&server, slen) == -1) {
-			cout << "Error sending delimiter.\n";
-		}
+		packet mySendPacket(2, sequenceNumber, 0, nullptr);
+		mySendPacket.serialize(spacket);
+		sendto(mysocket, spacket, 50, 0, (struct sockaddr *)&server, slen);
 	}
 
 	jmp:
