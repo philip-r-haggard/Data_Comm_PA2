@@ -18,10 +18,10 @@ using namespace std;  // using standard namespace
 // constructor for packet class
 // d points to memory already allocated prior to this call OR ELSE should be set to NULL
 packet::packet(int t, int s, int l, char * d){
-    type = t;
-    seqnum = s;
-    length = l;
-    data = d;
+    type = t; // 0 for ACK - 1 for data - 2 for EOT server to client - 3 for EOT client to server
+    seqnum = s; // either 0 or 1 - first sequence number should be 0 // ACKs have same seqnum as packet being acked
+    length = l; // number of characters carried in data field // should be in range of 0 - 30
+    data = d; // data should be null for ACK and length 0
 }
 
 // returns the type of packet
