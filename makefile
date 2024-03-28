@@ -21,3 +21,6 @@ packet.o: packet.cpp packet.h
 clean:
 	rm -f *.o client server packet
 	rm -f output.txt
+	rm -f clientseqnum.log
+	rm -f clientack.log
+	rm -f arrival.log
