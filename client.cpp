@@ -4,7 +4,7 @@
 // run ./server
 // run ./client localhost
 
-#include <stdlib.h>
+//#include <stdlib.h>
 #include <cstring>
 #include <cstdlib>
 #include <sys/types.h>   // defines types (like size_t)
@@ -23,6 +23,7 @@
 using namespace std;
 
 #define packetLen 50
+#define TIMEOUT 2 // Timeout value in seconds
 
 int main(int argc, char *argv[]){
     
@@ -36,6 +37,11 @@ int main(int argc, char *argv[]){
         cerr << "Failed to open file!\n";
         return 1;
     }
+
+    char payload[512];
+    memset(payload, 0, 512);
+    char serialized[512];
+    memset(serialized, 0, 512);
 
     struct hostent *s; 
     s = gethostbyname(argv[1]);
@@ -54,9 +60,25 @@ int main(int argc, char *argv[]){
         (char *)&server.sin_addr.s_addr,
         s->h_length);
 
-    char payload[512];
+    // Set timeout for the socket
+    struct timeval timeout;
+    timeout.tv_sec = 2; // Timeout in seconds
+    timeout.tv_usec = 0;
+    if (setsockopt(mysocket, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout)) < 0) {
+        cerr << "Error setting socket timeout." << endl;
+        return 1;
+    }
+
     int type;
-    int sequence_number;
+    int sequence_number = 0; // Initialize sequence number
+
+    packet rcvdAckPacket(0,0,0,payload);
+    int bytes_received;
+
+    // Initialize the timer variables
+    time_t start_time;
+    time_t current_time;
+    double elapsed_time;
     
     while (!file.eof()) {
         file.read(payload, 5); // Read a chunk from the file
@@ -76,7 +98,7 @@ int main(int argc, char *argv[]){
         char spacket[packetLen]; // Add space for null termination
         memset(spacket, 0, packetLen);
 
-        packet mySendPacket(1, 0, strlen(payload), payload); // make the packet to be serialized and sent
+        packet mySendPacket(1, sequence_number, strlen(payload), payload); // make the packet to be serialized and sent
 
         // Serialize packet
         mySendPacket.serialize(spacket);
@@ -84,15 +106,53 @@ int main(int argc, char *argv[]){
         // Send packet
         sendto(mysocket, spacket, packetLen, 0, (struct sockaddr *) &server, sizeof(server));
 
-        if (bytesRead < 5) {
-            packet clientEOT(3, 0, 0, nullptr);
-            char eot[bytesRead + 1];
-            memset(eot, 0, bytesRead + 1);
-            mySendPacket.serialize(eot);
-            sendto(mysocket, eot, packetLen, 0, (struct sockaddr *) &server, sizeof(server));
-            goto end;
+        time_t start = time(NULL);
+
+        while (true) {
+            // Receive ACK
+            bytes_received = 0;
+            if ((bytes_received = recvfrom(mysocket, serialized, 512, 0, (struct sockaddr *) &server, &slen)) == -1) {
+                if (errno == EWOULDBLOCK || errno == EAGAIN) { // Timeout occurred
+                    cerr << "Timeout occurred. Retransmitting packet..." << endl;
+                    // Resend packet
+                    sendto(mysocket, spacket, packetLen, 0, (struct sockaddr *) &server, slen);
+                    // Restart timer
+                    start = time(NULL);
+                } else {
+                    cerr << "Error in receiving ACK." << endl;
+                    return 1;
+                }
+            } else {
+                // Deserialize ACK
+                rcvdAckPacket.deserialize(serialized);
+                // Check if ACK is for the expected packet
+                if (rcvdAckPacket.getSeqNum() == 0 || rcvdAckPacket.getSeqNum() == 1) {
+                    // ACK received, break out of loop
+                    cout << "Received ACK for sequence number " << rcvdAckPacket.getSeqNum() << endl;
+                    break;
+                }
+            }
+
+            // Check if timeout has occurred
+            if (difftime(time(NULL), start) >= 2) {
+                cerr << "Timeout occurred. Retransmitting packet..." << endl;
+                // Resend packet
+                sendto(mysocket, spacket, packetLen, 0, (struct sockaddr *) &server, slen);
+                // Restart timer
+                start = time(NULL);
+            }
         }
+
+        sequence_number = (sequence_number + 1) % 2;
     }
+
+    packet clientEOT(3, 0, 0, nullptr);
+    char eot[packetLen];
+    memset(eot, 0, packetLen);
+    clientEOT.serialize(eot);
+    sendto(mysocket, eot, packetLen, 0, (struct sockaddr *) &server, sizeof(server));
+    cout << "Sending EOT packet!!!\n";
+    goto end;
 
     end:
 

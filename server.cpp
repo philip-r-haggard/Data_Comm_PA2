@@ -59,6 +59,9 @@ int main(int argc, char *argv[]) {
 
 	packet rcvdPacket(0,0,0,payload);
 	int bytes_received;
+
+	int expected_sequence_number = 0;
+
 	while (true) {
         // Receive a packet
 		bytes_received = 0;
@@ -71,16 +74,44 @@ int main(int argc, char *argv[]) {
 
 		rcvdPacket.deserialize(serialized);
 
-		cout << "Past deserialization\n";
+		// Check if EOT packet received
+		if (rcvdPacket.getType() == 3) {
+			// Send ACK for EOT packet
+			packet eotAckPacket(0, expected_sequence_number, 0, nullptr);
+			char eotAckSerialized[packetLen];
+			memset(eotAckSerialized, 0, packetLen);
+			eotAckPacket.serialize(eotAckSerialized);
+			sendto(mysocket, eotAckSerialized, packetLen, 0, (struct sockaddr *) &client, clen);
+			cout << "Received EOT. Sending ACK for EOT." << endl;
+			goto end; // Exit loop after receiving EOT
+		}
 
-    	rcvdPacket.printContents();
+		// Check if received packet has the expected sequence number
+        if (rcvdPacket.getSeqNum() == expected_sequence_number) {
+            // Send ACK for the received packet
+            packet ackPacket(0, expected_sequence_number, 0, nullptr);
+            char ackSerialized[packetLen];
+            memset(ackSerialized, 0, packetLen);
+            ackPacket.serialize(ackSerialized);
+            sendto(mysocket, ackSerialized, packetLen, 0, (struct sockaddr *) &client, clen);
 
-		cout << "Past the deserialization" << endl;
-        
-		// If it's an end of transmission packet, break the loop
-		if (rcvdPacket.getType() == 3)
-			break;
+            // Print received payload
+            cout << "Received: " << rcvdPacket.getData() << endl;
+
+            // Increment expected sequence number
+            expected_sequence_number = (expected_sequence_number + 1) % 2;
+        } else {
+            // Resend ACK for the last successfully received packet
+            packet ackPacket(0, (expected_sequence_number + 1) % 2, 0, nullptr);
+            char ackSerialized[packetLen];
+            memset(ackSerialized, 0, packetLen);
+            ackPacket.serialize(ackSerialized);
+            sendto(mysocket, ackSerialized, packetLen, 0, (struct sockaddr *) &client, clen);
+            cout << "Discarded out-of-order packet. Resending ACK for last successfully received packet." << endl;
+        }
     }
+
+	end:
 	
 	close(mysocket);
 	return 0;
